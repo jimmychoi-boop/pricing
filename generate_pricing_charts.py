@@ -381,6 +381,71 @@ if __name__ == "__main__":
         plt.close(fig)
         print(f"  Saved {path}")
 
+    # Head-to-head: PandaDoc Hypothetical vs each competitor
+    print("\nGenerating hypothetical vs competitor head-to-head charts...")
+    hyp_plans = HYPOTHETICAL["PandaDoc (Hypothetical)"]
+
+    competitor_matchups = [
+        ("DocuSign", COMPANIES["DocuSign"], "hyp_vs_docusign"),
+        ("Dropbox Sign", COMPANIES["Dropbox Sign"], "hyp_vs_dropbox_sign"),
+    ]
+
+    for comp_name, comp_plans, file_slug in competitor_matchups:
+        for annual, term_label, suffix in [(True, "Annual Billing", "annual"),
+                                            (False, "Monthly Billing", "monthly")]:
+            matchup = {
+                "PandaDoc\n(Hypothetical)": hyp_plans,
+                comp_name: comp_plans,
+            }
+
+            n_cols = len(matchup)
+            fig, axes = plt.subplots(1, n_cols, figsize=(6.5 * n_cols, 5.5),
+                                     squeeze=False)
+            fig.suptitle(
+                f"PandaDoc Hypothetical vs {comp_name} — {term_label} (Cheapest Plan, Monthly Cost)",
+                fontsize=14, fontweight="bold", y=1.02,
+            )
+
+            def cheapest_h2h(plans, seats, docs, is_annual):
+                best = None
+                for name, fn, has_a, has_m in plans:
+                    if is_annual and not has_a:
+                        continue
+                    if not is_annual and not has_m:
+                        continue
+                    cost = fn(seats, docs, is_annual)
+                    if cost is not None and (best is None or cost < best):
+                        best = cost
+                return best
+
+            global_max = 0
+            matrices = []
+            for label, plans in matchup.items():
+                mat = np.full((len(SEATS), len(DOCS_PER_MONTH)), np.nan)
+                for i, s in enumerate(SEATS):
+                    for j, d in enumerate(DOCS_PER_MONTH):
+                        c = cheapest_h2h(plans, s, d, annual)
+                        if c is not None:
+                            mat[i, j] = c
+                            global_max = max(global_max, c)
+                matrices.append(mat)
+
+            vmin, vmax = 0, max(global_max, 1)
+            for idx, (label, mat) in enumerate(zip(matchup, matrices)):
+                im = make_heatmap(axes[0][idx], mat, label, vmin, vmax)
+
+            cbar = fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.75, pad=0.04)
+            cbar.set_label("Monthly cost (USD)", fontsize=10)
+            cbar.ax.yaxis.set_major_formatter(
+                mticker.FuncFormatter(lambda x, _: f"${x:,.0f}")
+            )
+
+            fig.tight_layout()
+            path = os.path.join(OUTPUT_DIR, f"{file_slug}_{suffix}.png")
+            fig.savefig(path, dpi=150, bbox_inches="tight", facecolor="white")
+            plt.close(fig)
+            print(f"  Saved {path}")
+
     print("\nGenerating side-by-side comparison...")
     generate_side_by_side("comparison_cheapest.png")
 
