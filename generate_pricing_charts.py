@@ -81,6 +81,17 @@ def pandadoc_business(seats, docs_mo, annual):
 OVERAGE_PER_DOC = 4.0
 
 
+def pandadoc_hyp_free(seats, docs_mo, annual):
+    """Hypothetical Free: 5 docs/mo or 60 docs/yr. Hard cap (no overage). Unlimited seats."""
+    if annual:
+        if docs_mo * 12 > 60:
+            return None
+    else:
+        if docs_mo > 5:
+            return None
+    return 0.0
+
+
 def pandadoc_hyp_starter(seats, docs_mo, annual):
     """Hypothetical Starter: flat $19/$35, 15 docs/mo or 180 docs/yr. $4/doc overage. Unlimited seats."""
     if annual:
@@ -154,6 +165,7 @@ COMPANIES = {
 
 HYPOTHETICAL = {
     "PandaDoc (Hypothetical)": [
+        ("Free\n∞ seats\n5/mo or 60/yr cap", pandadoc_hyp_free, True, True),
         ("Starter\n∞ seats, flat fee\n15/mo or 180/yr cap\n+$4/doc overage", pandadoc_hyp_starter, True, True),
         ("Business\n∞ seats, flat fee\n20/mo or 240/yr cap\n+$4/doc overage", pandadoc_hyp_business, True, True),
     ],
