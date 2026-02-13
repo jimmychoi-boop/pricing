@@ -118,18 +118,18 @@ def dropbox_essentials(seats, docs_mo, annual):
 
 
 def dropbox_standard(seats, docs_mo, annual):
-    """Min 2 seats, max ~4 self-serve. Unlimited sending."""
-    if seats < 2:
+    """2-4 seats only. Unlimited sending."""
+    if seats < 2 or seats > 4:
         return None
     price = 25.0 if annual else 30.0
     return price * seats
 
 
 def dropbox_premium(seats, docs_mo, annual):
-    """Min 5 seats, custom pricing. Estimate ~$40/user/mo annual."""
+    """Min 5 seats, ~$50/user/mo."""
     if seats < 5:
         return None
-    return 40.0 * seats  # annual only, enterprise/custom for monthly
+    return 50.0 * seats  # annual only, enterprise/custom for monthly
 
 
 # ── Plan registry ─────────────────────────────────────────────────────────────
