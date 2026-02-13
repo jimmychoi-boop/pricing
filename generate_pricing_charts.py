@@ -75,32 +75,32 @@ def pandadoc_business(seats, docs_mo, annual):
 
 
 # ── Hypothetical PandaDoc (doc-capped, unlimited seats, $4/doc overage) ──────
-# Same per-seat price but with document caps. Overage at $4/doc beyond cap.
+# Flat fee (unlimited seats) with document caps. Overage at $4/doc beyond cap.
 # Monthly plans: check docs_mo against monthly cap.
 # Annual plans: check docs_mo * 12 against annual cap.
 OVERAGE_PER_DOC = 4.0
 
 
 def pandadoc_hyp_starter(seats, docs_mo, annual):
-    """Hypothetical Starter: 15 docs/mo or 180 docs/yr. $4/doc overage."""
+    """Hypothetical Starter: flat $19/$35, 15 docs/mo or 180 docs/yr. $4/doc overage. Unlimited seats."""
     if annual:
         annual_docs = docs_mo * 12
         overage = max(0, annual_docs - 180) * OVERAGE_PER_DOC / 12  # spread monthly
-        return 19.0 * seats + overage
+        return 19.0 + overage
     else:
         overage = max(0, docs_mo - 15) * OVERAGE_PER_DOC
-        return 35.0 * seats + overage
+        return 35.0 + overage
 
 
 def pandadoc_hyp_business(seats, docs_mo, annual):
-    """Hypothetical Business: 20 docs/mo or 240 docs/yr. $4/doc overage."""
+    """Hypothetical Business: flat $49/$65, 20 docs/mo or 240 docs/yr. $4/doc overage. Unlimited seats."""
     if annual:
         annual_docs = docs_mo * 12
         overage = max(0, annual_docs - 240) * OVERAGE_PER_DOC / 12  # spread monthly
-        return 49.0 * seats + overage
+        return 49.0 + overage
     else:
         overage = max(0, docs_mo - 20) * OVERAGE_PER_DOC
-        return 65.0 * seats + overage
+        return 65.0 + overage
 
 
 def dropbox_free(seats, docs_mo, annual):
@@ -153,8 +153,8 @@ COMPANIES = {
 
 HYPOTHETICAL = {
     "PandaDoc (Hypothetical)": [
-        ("Starter\n(15/mo or 180/yr\n+$4/doc overage)", pandadoc_hyp_starter, True, True),
-        ("Business\n(20/mo or 240/yr\n+$4/doc overage)", pandadoc_hyp_business, True, True),
+        ("Starter\n∞ seats, flat fee\n15/mo or 180/yr cap\n+$4/doc overage", pandadoc_hyp_starter, True, True),
+        ("Business\n∞ seats, flat fee\n20/mo or 240/yr cap\n+$4/doc overage", pandadoc_hyp_business, True, True),
     ],
 }
 # Tuple: (plan_name, cost_fn, has_annual, has_monthly)
