@@ -6,7 +6,7 @@
 |---|---|---|---|
 | **Free Plan** | No (free trial only) | Yes (unlimited seats, 5 docs/mo) | Yes (3 requests/mo) |
 | **Lowest Paid Plan** | $10/mo (Personal) | $19/user/mo (Starter) | $15/user/mo (Essentials) |
-| **Mid-Tier Plan** | $25/user/mo (Standard) | $49/user/mo (Business) | $25/user/mo (Standard) |
+| **Mid-Tier Plan** | $25/user/mo (Standard) | $49/user/mo (Business) | $25/user/mo (Standard, min 2 seats) |
 | **Upper-Tier Plan** | $40/user/mo (Business Pro) | Custom (Enterprise) | Custom (Premium) |
 | **Enterprise Plan** | Custom | Custom | Custom |
 | **Unlimited Sending** | No (envelope limits) | Yes (all plans) | Yes (paid plans) |
@@ -82,8 +82,23 @@
 |---|---|---|---|
 | **Free** | $0 | $0 | 1 user |
 | **Essentials** | $15/user/mo | — | 1 user |
-| **Standard** | $25/user/mo | — | 2+ users (minimum 2) |
-| **Premium** | Custom | Custom | Custom |
+| **Standard** | $25/user/mo | — | Min 2, max ~4 self-serve |
+| **Premium** | Custom | Custom | Min 5, contact sales |
+
+### Seat Minimums & Caps
+
+Dropbox Sign enforces seat minimums on its higher-tier plans and limits how many licenses you can purchase online:
+
+| Plan | Seat Minimum | Self-Serve Cap | Beyond Cap |
+|---|---|---|---|
+| **Free** | 1 | 1 | — |
+| **Essentials** | 1 | 1 | — |
+| **Standard** | **2 seats** | ~4 licenses | Must contact sales |
+| **Premium** | **5 seats** | — | Contact sales required |
+
+- **Standard**: The 2-seat minimum means the real entry price is **$600/year** ($25/user/mo x 2 x 12), not $300. Solo users who want Standard features (custom branding, advanced form fields, team management) must pay for an unused second seat. You can buy up to ~4 licenses through self-serve; larger teams must go through sales.
+- **Premium**: Requires a minimum of 5 seats with fully custom pricing — strictly an enterprise/sales-driven plan.
+- **Implication for small teams**: A solo user or 1-person team wanting features beyond Essentials is forced into paying double. This makes Dropbox Sign less competitive for individuals compared to DocuSign or PandaDoc, where plans scale from a single seat.
 
 ### Key Features by Plan
 
@@ -107,7 +122,7 @@
 **DocuSign Personal ($10/mo)** is the cheapest paid option for a single user with light usage (5 envelopes/month). **PandaDoc Free** is ideal if you need occasional eSignatures at no cost.
 
 ### Best for Small Teams (2-10 users)
-**Dropbox Sign Standard ($25/user/mo)** offers unlimited sending with team features at a competitive price. **PandaDoc Starter ($19/user/mo)** is the cheapest per-seat option with unlimited documents.
+**Dropbox Sign Standard ($25/user/mo)** offers unlimited sending with team features at a competitive price, but requires a 2-seat minimum and caps self-serve purchases at ~4 licenses. **PandaDoc Starter ($19/user/mo)** is the cheapest per-seat option with unlimited documents and no seat minimums.
 
 ### Best for Growing Businesses
 **PandaDoc Business ($49/user/mo)** stands out with CRM integrations, approval workflows, and document analytics included. **DocuSign Business Pro ($40/user/mo)** is slightly cheaper but comes with envelope limits.
@@ -122,7 +137,8 @@ All three offer custom enterprise plans. **DocuSign** has the strongest brand re
 | **Cheapest free plan** | PandaDoc (unlimited seats) |
 | **Cheapest paid plan** | DocuSign Personal ($10/mo) |
 | **Unlimited sending** | PandaDoc & Dropbox Sign |
-| **Best value for teams** | Dropbox Sign |
+| **Best value for teams (2+)** | Dropbox Sign (but 2-seat min) |
+| **Fewest seat restrictions** | PandaDoc & DocuSign |
 | **CRM integrations** | PandaDoc |
 | **Brand & ecosystem** | DocuSign |
 | **Compliance (HIPAA)** | Dropbox Sign (Premium) |
@@ -137,3 +153,5 @@ All three offer custom enterprise plans. **DocuSign** has the strongest brand re
 - [DocuSign Pricing - TrustRadius](https://www.trustradius.com/products/docusign/pricing)
 - [PandaDoc Pricing - Docupilot](https://www.docupilot.com/blog/pandadoc-pricing)
 - [Dropbox Sign Pricing - TopAdvisor](https://www.topadvisor.com/products/dropbox-sign/pricing)
+- [Dropbox Sign Pricing & Features - Certinal](https://www.certinal.com/blog/dropbox-sign-pricing)
+- [Dropbox Sign Standard Plan Minimum Users - Dropbox Community](https://www.dropboxforum.com/discussions/101001018/do-i-have-to-have-a-min-of-3-users-to-get-on-the-standard-plan/697112)
