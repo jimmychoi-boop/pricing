@@ -74,6 +74,35 @@ def pandadoc_business(seats, docs_mo, annual):
     return price * seats
 
 
+# ── Hypothetical PandaDoc (doc-capped, unlimited seats, $4/doc overage) ──────
+# Same per-seat price but with document caps. Overage at $4/doc beyond cap.
+# Monthly plans: check docs_mo against monthly cap.
+# Annual plans: check docs_mo * 12 against annual cap.
+OVERAGE_PER_DOC = 4.0
+
+
+def pandadoc_hyp_starter(seats, docs_mo, annual):
+    """Hypothetical Starter: 15 docs/mo or 180 docs/yr. $4/doc overage."""
+    if annual:
+        annual_docs = docs_mo * 12
+        overage = max(0, annual_docs - 180) * OVERAGE_PER_DOC / 12  # spread monthly
+        return 19.0 * seats + overage
+    else:
+        overage = max(0, docs_mo - 15) * OVERAGE_PER_DOC
+        return 35.0 * seats + overage
+
+
+def pandadoc_hyp_business(seats, docs_mo, annual):
+    """Hypothetical Business: 20 docs/mo or 240 docs/yr. $4/doc overage."""
+    if annual:
+        annual_docs = docs_mo * 12
+        overage = max(0, annual_docs - 240) * OVERAGE_PER_DOC / 12  # spread monthly
+        return 49.0 * seats + overage
+    else:
+        overage = max(0, docs_mo - 20) * OVERAGE_PER_DOC
+        return 65.0 * seats + overage
+
+
 def dropbox_free(seats, docs_mo, annual):
     """1 user, 3 requests/mo."""
     if seats != 1 or docs_mo > 3:
@@ -119,6 +148,13 @@ COMPANIES = {
         ("Essentials", dropbox_essentials, True,  False),
         ("Standard",   dropbox_standard,   True,  False),
         ("Premium\n(est.)", dropbox_premium, True, False),
+    ],
+}
+
+HYPOTHETICAL = {
+    "PandaDoc (Hypothetical)": [
+        ("Starter\n(15/mo or 180/yr\n+$4/doc overage)", pandadoc_hyp_starter, True, True),
+        ("Business\n(20/mo or 240/yr\n+$4/doc overage)", pandadoc_hyp_business, True, True),
     ],
 }
 # Tuple: (plan_name, cost_fn, has_annual, has_monthly)
@@ -285,6 +321,65 @@ if __name__ == "__main__":
     for company, plans in COMPANIES.items():
         slug = company.lower().replace(" ", "_")
         generate_company_chart(company, plans, f"{slug}_pricing.png")
+
+    print("\nGenerating hypothetical charts...")
+    for company, plans in HYPOTHETICAL.items():
+        slug = company.lower().replace(" ", "_").replace("(", "").replace(")", "")
+        generate_company_chart(company, plans, f"{slug}_pricing.png")
+
+    # Side-by-side: actual PandaDoc vs hypothetical PandaDoc vs each competitor
+    print("\nGenerating hypothetical vs actual comparison...")
+    hyp_compare = {
+        "PandaDoc\n(Actual: Unlimited)": COMPANIES["PandaDoc"],
+        "PandaDoc\n(Hypothetical: Capped)": HYPOTHETICAL["PandaDoc (Hypothetical)"],
+        "DocuSign": COMPANIES["DocuSign"],
+        "Dropbox Sign": COMPANIES["Dropbox Sign"],
+    }
+    for annual, term_label, suffix in [(True, "Annual Billing", "annual"),
+                                        (False, "Monthly Billing", "monthly")]:
+        n_companies = len(hyp_compare)
+        fig, axes = plt.subplots(1, n_companies, figsize=(4.8 * n_companies, 5),
+                                 squeeze=False)
+        fig.suptitle(f"Cheapest Plan — {term_label} (PandaDoc Actual vs Hypothetical vs Competitors)",
+                     fontsize=13, fontweight="bold", y=1.02)
+
+        def cheapest(company_plans, seats, docs, is_annual):
+            best = None
+            for name, fn, has_a, has_m in company_plans:
+                if is_annual and not has_a:
+                    continue
+                if not is_annual and not has_m:
+                    continue
+                cost = fn(seats, docs, is_annual)
+                if cost is not None and (best is None or cost < best):
+                    best = cost
+            return best
+
+        global_max = 0
+        matrices = []
+        for company, plans in hyp_compare.items():
+            mat = np.full((len(SEATS), len(DOCS_PER_MONTH)), np.nan)
+            for i, s in enumerate(SEATS):
+                for j, d in enumerate(DOCS_PER_MONTH):
+                    c = cheapest(plans, s, d, annual)
+                    if c is not None:
+                        mat[i, j] = c
+                        global_max = max(global_max, c)
+            matrices.append(mat)
+
+        vmin, vmax = 0, max(global_max, 1)
+        for idx, (company, mat) in enumerate(zip(hyp_compare, matrices)):
+            im = make_heatmap(axes[0][idx], mat, company, vmin, vmax)
+
+        cbar = fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.75, pad=0.04)
+        cbar.set_label("Monthly cost (USD)", fontsize=10)
+        cbar.ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"${x:,.0f}"))
+
+        fig.tight_layout()
+        path = os.path.join(OUTPUT_DIR, f"hypothetical_comparison_{suffix}.png")
+        fig.savefig(path, dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        print(f"  Saved {path}")
 
     print("\nGenerating side-by-side comparison...")
     generate_side_by_side("comparison_cheapest.png")
