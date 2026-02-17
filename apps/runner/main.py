@@ -145,35 +145,34 @@ def run_pipeline() -> None:
         for sig in all_signals:
             db.save_signal(run_record.run_id, sig)
 
-        # ── 7. Run Leader Agent ───────────────────────────────────────
+        # ── 7. Run Leader Agent (Agent C) — cross-reference + synthesize ─
         log.info("Running leader agent on %d signals", len(all_signals))
-        ranked, recap_text = leader_agent.run(
+        ranked, recap_text, recap_output = leader_agent.run(
             signals=all_signals,
             operating_context=operating_context,
+            metrics_output=metrics_output,
         )
 
         stats["recap_length"] = len(recap_text)
         stats["ranked_signals"] = len(ranked)
+        stats["verdicts"] = len(recap_output.verdicts)
+        stats["cross_references"] = len(recap_output.cross_references)
 
         # ── 8. Output recap ───────────────────────────────────────────
         log.info("Recap generated — saved to DB for downstream consumption")
         print("\n" + recap_text + "\n")
 
-        # Log metrics intelligence summary
-        if metrics_output.anomalies:
-            log.info(
-                "Metrics Intelligence summary: %d anomalies detected, "
-                "%d driver decompositions, %d segment impacts, "
-                "%d follow-up queries generated",
-                len(metrics_output.anomalies),
-                len(metrics_output.drivers),
-                len(metrics_output.segments),
-                len(metrics_output.follow_up_queries),
-            )
+        log.info(
+            "Pipeline summary: %d signals -> %d cross-refs -> %d verdicts",
+            len(all_signals),
+            len(recap_output.cross_references),
+            len(recap_output.verdicts),
+        )
 
         # ── 9. Finalize run ───────────────────────────────────────────
         stats["recap_text"] = recap_text
         stats["metrics_intelligence"] = metrics_output.to_dict()
+        stats["recap_output"] = recap_output.to_dict()
         db.finish_run(run_record.run_id, "success", stats)
         log.info("=== Run %s completed successfully ===", run_record.run_id)
 

@@ -56,3 +56,10 @@ metrics_intelligence:
       severity: 4
     - max_pct: 999999.0
       severity: 5
+
+# ────────────────────────────────────────────────────────────────────────
+# Leader Agent (Agent C) — synthesis & verdict config
+# ────────────────────────────────────────────────────────────────────────
+leader:
+  max_verdicts: 7           # max verdicts in the recap
+  max_watchlist: 3           # secondary items below the verdicts

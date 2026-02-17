@@ -178,6 +178,70 @@ class MetricsIntelligenceOutput:
         }
 
 
+# ── Leader Agent (Agent C) output models ───────────────────────────────
+
+
+@dataclass
+class CrossReference:
+    """A connection the Leader found between a doc signal and a metric signal."""
+
+    doc_signal_id: str
+    metric_signal_id: str | None  # None if no metric match
+    metric_name: str | None
+    relationship: Literal["confirms", "contradicts", "adds_context", "unrelated"]
+    explanation: str
+    combined_severity: int  # re-scored severity after correlation
+    combined_evidence: list[Evidence] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["combined_evidence"] = [e.to_dict() for e in self.combined_evidence]
+        return d
+
+
+@dataclass
+class Verdict:
+    """A synthesized call the Leader makes after cross-referencing all inputs."""
+
+    verdict_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    priority: Literal["critical", "high", "medium", "low"] = "medium"
+    title: str = ""
+    narrative: str = ""  # the "so what" — plain-language synthesis
+    action: str = ""  # the call: what should be done
+    owner: str | None = None  # who should act
+    deadline: Literal["today", "this_week", "this_month"] | None = None
+    supporting_signals: list[str] = field(default_factory=list)  # signal_ids
+    cross_references: list[CrossReference] = field(default_factory=list)
+    follow_up_queries: list[FollowUpQuery] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["cross_references"] = [c.to_dict() for c in self.cross_references]
+        d["follow_up_queries"] = [q.to_dict() for q in self.follow_up_queries]
+        return d
+
+
+@dataclass
+class RecapOutput:
+    """Full structured output from Agent C (Leader)."""
+
+    run_timestamp: str
+    verdicts: list[Verdict] = field(default_factory=list)
+    cross_references: list[CrossReference] = field(default_factory=list)
+    ranked_signals: list[Signal] = field(default_factory=list)
+    recap_text: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "run_timestamp": self.run_timestamp,
+            "verdicts": [v.to_dict() for v in self.verdicts],
+            "cross_references": [c.to_dict() for c in self.cross_references],
+            "ranked_signals": [s.to_dict() for s in self.ranked_signals],
+            "recap_text": self.recap_text,
+        }
+
+
 @dataclass
 class RunRecord:
     run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
