@@ -1,0 +1,14 @@
+# Google Drive sources for the Daily Strategy Recap
+# Replace folder IDs with your actual Google Drive folder IDs.
+
+drive_folder_ids:
+  - "REPLACE_WITH_FOLDER_ID_1"
+  # - "REPLACE_WITH_FOLDER_ID_2"
+
+allowed_mime_types:
+  - "application/vnd.google-apps.document"
+
+max_files: 50
+
+# How far back to look for changes (hours)
+lookback_hours: 24

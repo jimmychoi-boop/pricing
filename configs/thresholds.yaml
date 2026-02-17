@@ -1,0 +1,21 @@
+# Signal severity and ranking thresholds
+
+# Minimum severity to include in the final recap (1-5)
+min_severity: 2
+
+# Minimum confidence to include (0.0-1.0)
+min_confidence: 0.3
+
+# Top-N limits for the Slack recap
+top_issues: 5
+watchlist_items: 3
+
+# Metric anomaly thresholds
+metric_anomaly:
+  # Percentage change from previous day to flag as anomaly
+  pct_change_threshold: 15.0
+  # Absolute delta threshold (fallback when previous value is 0)
+  abs_change_threshold: 10.0
+
+# Fuzzy-match threshold for deduplication (0-100)
+dedup_similarity: 80

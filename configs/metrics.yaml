@@ -1,0 +1,47 @@
+# Metric definitions for the Daily Strategy Recap.
+# MVP: stub values are used when no warehouse connection is available.
+# Later: replace stub_value with a real SQL query or Hex notebook reference.
+
+metrics:
+  - name: "daily_active_users"
+    display_name: "Daily Active Users"
+    description: "Number of unique users active in the last 24 hours"
+    stub_value: 12450
+    unit: "users"
+    # sql: "SELECT COUNT(DISTINCT user_id) FROM events WHERE event_date = CURRENT_DATE"
+
+  - name: "new_signups"
+    display_name: "New Signups"
+    description: "New account registrations in the last 24 hours"
+    stub_value: 342
+    unit: "accounts"
+
+  - name: "mrr"
+    display_name: "Monthly Recurring Revenue"
+    description: "Current MRR as of today"
+    stub_value: 2850000
+    unit: "USD"
+
+  - name: "churn_rate"
+    display_name: "Churn Rate"
+    description: "Percentage of customers churned in the last 30 days"
+    stub_value: 3.2
+    unit: "%"
+
+  - name: "nps_score"
+    display_name: "NPS Score"
+    description: "Net Promoter Score from latest survey batch"
+    stub_value: 47
+    unit: "score"
+
+  - name: "support_tickets_open"
+    display_name: "Open Support Tickets"
+    description: "Number of currently open support tickets"
+    stub_value: 89
+    unit: "tickets"
+
+  - name: "avg_deal_cycle_days"
+    display_name: "Avg Deal Cycle"
+    description: "Average days from opportunity creation to close"
+    stub_value: 34
+    unit: "days"
