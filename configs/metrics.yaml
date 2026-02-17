@@ -1,13 +1,19 @@
 # Metric definitions for the Daily Strategy Recap — Metrics Intelligence Agent.
 #
 # Each metric belongs to a dataset group and can source data from:
-#   - stub_value: hardcoded value for MVP / offline testing
-#   - sql: warehouse query (executed when warehouse connector is active)
+#   - sql: Snowflake query (executed when SNOWFLAKE_ACCOUNT is configured)
 #   - hex_query_id: Hex saved query ID (executed via Hex API)
-#   - hex_chart_id: Hex saved chart for visual reference
+#   - stub_value: hardcoded value for offline testing / fallback
 #
-# Segment breakdowns define the dimensions along which the agent
-# decomposes movements (plan, SA/SS, cohort, region, channel, product_line).
+# Resolution priority: hex_query_id > sql > stub_value
+#
+# SQL conventions:
+#   - Every metric query must return a column named "value"
+#   - Segment queries must return two columns: (segment_name, value)
+#   - Driver queries return a single scalar "value"
+#
+# TODO: Replace these template SQL queries with your actual Snowflake schema.
+#       The table/column names below are examples — adapt to your data model.
 
 # ────────────────────────────────────────────────────────────────────────
 # Dataset: MRR Movements
@@ -22,30 +28,33 @@ datasets:
         description: "Current total monthly recurring revenue"
         stub_value: 2850000
         unit: "$"
-        # sql: "SELECT SUM(mrr) FROM subscriptions WHERE status = 'active'"
-        # hex_query_id: "q-mrr-total-daily"
+        sql: "SELECT SUM(mrr) AS value FROM subscriptions WHERE status = 'active'"
         drivers:
           - name: "new_business"
             display_name: "New Business"
             description: "MRR from newly acquired customers"
             stub_value: 145000
-            # sql: "SELECT SUM(mrr) FROM subscriptions WHERE activated_date = CURRENT_DATE"
+            sql: "SELECT SUM(mrr) AS value FROM subscriptions WHERE activated_date = CURRENT_DATE AND is_new_customer = TRUE"
           - name: "expansion"
             display_name: "Expansion"
             description: "MRR increase from existing customers (upgrades, add-ons)"
             stub_value: 82000
+            sql: "SELECT SUM(delta_mrr) AS value FROM mrr_movements WHERE movement_type = 'expansion' AND movement_date = CURRENT_DATE"
           - name: "contraction"
             display_name: "Contraction"
             description: "MRR decrease from existing customers (downgrades)"
             stub_value: -31000
+            sql: "SELECT SUM(delta_mrr) AS value FROM mrr_movements WHERE movement_type = 'contraction' AND movement_date = CURRENT_DATE"
           - name: "churn"
             display_name: "Churn"
             description: "MRR lost from cancelled subscriptions"
             stub_value: -67000
+            sql: "SELECT SUM(delta_mrr) AS value FROM mrr_movements WHERE movement_type = 'churn' AND movement_date = CURRENT_DATE"
           - name: "reactivation"
             display_name: "Reactivation"
             description: "MRR from previously churned customers returning"
             stub_value: 12000
+            sql: "SELECT SUM(delta_mrr) AS value FROM mrr_movements WHERE movement_type = 'reactivation' AND movement_date = CURRENT_DATE"
         segments:
           plan: ["free", "starter", "professional", "enterprise"]
           sa_ss: ["self_serve", "sales_assisted"]
@@ -59,18 +68,28 @@ datasets:
         description: "Net change in MRR (new + expansion - churn - contraction + reactivation)"
         stub_value: 141000
         unit: "$"
+        sql: "SELECT SUM(delta_mrr) AS value FROM mrr_movements WHERE movement_date = CURRENT_DATE"
 
       - name: "churn_rate_mrr"
         display_name: "MRR Churn Rate"
         description: "Percentage of MRR lost to churn in the last 30 days"
         stub_value: 2.35
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * ABS(SUM(CASE WHEN movement_type = 'churn' THEN delta_mrr ELSE 0 END))
+            / NULLIF(SUM(CASE WHEN movement_type = 'beginning_balance' THEN mrr ELSE 0 END), 0), 2) AS value
+          FROM mrr_movements
+          WHERE movement_date BETWEEN DATEADD('day', -30, CURRENT_DATE) AND CURRENT_DATE
 
       - name: "net_dollar_retention"
         display_name: "Net Dollar Retention"
         description: "Revenue retention from existing customers (>100% = expansion)"
         stub_value: 108.5
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * SUM(current_mrr) / NULLIF(SUM(starting_mrr), 0), 2) AS value
+          FROM cohort_retention
+          WHERE cohort_month = DATEADD('month', -1, DATE_TRUNC('month', CURRENT_DATE))
 
   # ────────────────────────────────────────────────────────────────────────
   # Dataset: Usage (docs sent/created)
@@ -84,19 +103,23 @@ datasets:
         description: "Total documents sent for signature in last 24h"
         stub_value: 48750
         unit: "docs"
+        sql: "SELECT COUNT(*) AS value FROM documents WHERE action = 'sent' AND created_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
         drivers:
           - name: "api_sends"
             display_name: "API Sends"
             description: "Documents sent via API integrations"
             stub_value: 31200
+            sql: "SELECT COUNT(*) AS value FROM documents WHERE action = 'sent' AND source = 'api' AND created_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
           - name: "web_sends"
             display_name: "Web App Sends"
             description: "Documents sent through the web application"
             stub_value: 14350
+            sql: "SELECT COUNT(*) AS value FROM documents WHERE action = 'sent' AND source = 'web' AND created_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
           - name: "mobile_sends"
             display_name: "Mobile Sends"
             description: "Documents sent from mobile apps"
             stub_value: 3200
+            sql: "SELECT COUNT(*) AS value FROM documents WHERE action = 'sent' AND source = 'mobile' AND created_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
         segments:
           plan: ["free", "starter", "professional", "enterprise"]
           sa_ss: ["self_serve", "sales_assisted"]
@@ -107,18 +130,25 @@ datasets:
         description: "New documents/templates created in last 24h"
         stub_value: 12340
         unit: "docs"
+        sql: "SELECT COUNT(*) AS value FROM documents WHERE action = 'created' AND created_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
 
       - name: "docs_completed"
         display_name: "Documents Completed"
         description: "Documents fully signed and completed in last 24h"
         stub_value: 41200
         unit: "docs"
+        sql: "SELECT COUNT(*) AS value FROM documents WHERE status = 'completed' AND completed_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
 
       - name: "completion_rate"
         display_name: "Completion Rate"
         description: "Percentage of sent documents that reached completed status"
         stub_value: 84.5
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * COUNT(CASE WHEN status = 'completed' THEN 1 END)
+            / NULLIF(COUNT(*), 0), 2) AS value
+          FROM documents
+          WHERE action = 'sent' AND created_at >= DATEADD('day', -7, CURRENT_DATE)
 
   # ────────────────────────────────────────────────────────────────────────
   # Dataset: Seats
@@ -132,6 +162,7 @@ datasets:
         description: "Total seats under active subscription"
         stub_value: 87500
         unit: "seats"
+        sql: "SELECT SUM(seat_count) AS value FROM subscriptions WHERE status = 'active'"
         segments:
           plan: ["starter", "professional", "enterprise"]
           sa_ss: ["self_serve", "sales_assisted"]
@@ -141,31 +172,51 @@ datasets:
         description: "Seats with at least one login in the last 30 days"
         stub_value: 62300
         unit: "seats"
+        sql: "SELECT COUNT(DISTINCT user_id) AS value FROM user_sessions WHERE session_start >= DATEADD('day', -30, CURRENT_DATE)"
 
       - name: "seat_utilization"
         display_name: "Seat Utilization"
         description: "Percentage of licensed seats that are active"
         stub_value: 71.2
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * active_seats.cnt / NULLIF(licensed.cnt, 0), 2) AS value
+          FROM (SELECT COUNT(DISTINCT user_id) AS cnt FROM user_sessions WHERE session_start >= DATEADD('day', -30, CURRENT_DATE)) active_seats,
+               (SELECT SUM(seat_count) AS cnt FROM subscriptions WHERE status = 'active') licensed
         drivers:
           - name: "enterprise_utilization"
             display_name: "Enterprise Utilization"
             stub_value: 64.0
             description: "Enterprise plan seat utilization"
+            sql: >
+              SELECT ROUND(100.0 * COUNT(DISTINCT s.user_id) / NULLIF(SUM(sub.seat_count), 0), 2) AS value
+              FROM user_sessions s JOIN subscriptions sub ON s.account_id = sub.account_id
+              WHERE sub.plan = 'enterprise' AND sub.status = 'active' AND s.session_start >= DATEADD('day', -30, CURRENT_DATE)
           - name: "professional_utilization"
             display_name: "Professional Utilization"
             stub_value: 78.5
             description: "Professional plan seat utilization"
+            sql: >
+              SELECT ROUND(100.0 * COUNT(DISTINCT s.user_id) / NULLIF(SUM(sub.seat_count), 0), 2) AS value
+              FROM user_sessions s JOIN subscriptions sub ON s.account_id = sub.account_id
+              WHERE sub.plan = 'professional' AND sub.status = 'active' AND s.session_start >= DATEADD('day', -30, CURRENT_DATE)
           - name: "starter_utilization"
             display_name: "Starter Utilization"
             stub_value: 81.3
             description: "Starter plan seat utilization"
+            sql: >
+              SELECT ROUND(100.0 * COUNT(DISTINCT s.user_id) / NULLIF(SUM(sub.seat_count), 0), 2) AS value
+              FROM user_sessions s JOIN subscriptions sub ON s.account_id = sub.account_id
+              WHERE sub.plan = 'starter' AND sub.status = 'active' AND s.session_start >= DATEADD('day', -30, CURRENT_DATE)
 
       - name: "seats_net_added"
         display_name: "Net Seats Added"
         description: "Net new seats added (provisioned minus deprovisioned) in last 24h"
         stub_value: 340
         unit: "seats"
+        sql: >
+          SELECT SUM(CASE WHEN action = 'provision' THEN seat_count ELSE -seat_count END) AS value
+          FROM seat_changes WHERE changed_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())
 
   # ────────────────────────────────────────────────────────────────────────
   # Dataset: Purchases & Add-ons
@@ -179,21 +230,25 @@ datasets:
         description: "Envelope pack purchases in last 24h"
         stub_value: 1250
         unit: "purchases"
+        sql: "SELECT COUNT(*) AS value FROM purchases WHERE product_type = 'envelope_pack' AND purchased_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
         drivers:
           - name: "overage_triggered"
             display_name: "Overage-Triggered"
             description: "Purchases triggered by hitting envelope limits"
             stub_value: 820
+            sql: "SELECT COUNT(*) AS value FROM purchases WHERE product_type = 'envelope_pack' AND trigger_reason = 'overage' AND purchased_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
           - name: "proactive_topup"
             display_name: "Proactive Top-up"
             description: "Purchases made before hitting limits"
             stub_value: 430
+            sql: "SELECT COUNT(*) AS value FROM purchases WHERE product_type = 'envelope_pack' AND trigger_reason = 'proactive' AND purchased_at >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
 
       - name: "addon_subscriptions"
         display_name: "Add-on Subscriptions"
         description: "New add-on feature subscriptions in last 24h"
         stub_value: 185
         unit: "subscriptions"
+        sql: "SELECT COUNT(*) AS value FROM subscriptions WHERE is_addon = TRUE AND activated_date = CURRENT_DATE"
         segments:
           product_line: ["api_access", "advanced_fields", "sms_auth", "id_verification", "bulk_send"]
 
@@ -202,6 +257,7 @@ datasets:
         description: "Monthly recurring revenue from add-on subscriptions"
         stub_value: 385000
         unit: "$"
+        sql: "SELECT SUM(mrr) AS value FROM subscriptions WHERE is_addon = TRUE AND status = 'active'"
 
   # ────────────────────────────────────────────────────────────────────────
   # Dataset: Adoption Funnels
@@ -215,6 +271,11 @@ datasets:
         description: "Conversion rate from signup to first document send (7-day window)"
         stub_value: 34.2
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN first_send_at IS NOT NULL THEN user_id END)
+            / NULLIF(COUNT(DISTINCT user_id), 0), 2) AS value
+          FROM user_activation
+          WHERE signup_date BETWEEN DATEADD('day', -14, CURRENT_DATE) AND DATEADD('day', -7, CURRENT_DATE)
         segments:
           sa_ss: ["self_serve", "sales_assisted"]
           channel: ["direct", "partner", "marketplace"]
@@ -224,39 +285,68 @@ datasets:
         description: "Conversion rate from trial start to paid subscription"
         stub_value: 18.7
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN converted_at IS NOT NULL THEN account_id END)
+            / NULLIF(COUNT(DISTINCT account_id), 0), 2) AS value
+          FROM trials
+          WHERE trial_start BETWEEN DATEADD('day', -30, CURRENT_DATE) AND DATEADD('day', -14, CURRENT_DATE)
         drivers:
           - name: "self_serve_conversion"
             display_name: "Self-Serve Conversion"
             stub_value: 12.4
             description: "Trial-to-paid for self-serve signups"
+            sql: >
+              SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN converted_at IS NOT NULL THEN account_id END)
+                / NULLIF(COUNT(DISTINCT account_id), 0), 2) AS value
+              FROM trials
+              WHERE acquisition_type = 'self_serve'
+                AND trial_start BETWEEN DATEADD('day', -30, CURRENT_DATE) AND DATEADD('day', -14, CURRENT_DATE)
           - name: "sales_assisted_conversion"
             display_name: "Sales-Assisted Conversion"
             stub_value: 38.2
             description: "Trial-to-paid for sales-assisted signups"
+            sql: >
+              SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN converted_at IS NOT NULL THEN account_id END)
+                / NULLIF(COUNT(DISTINCT account_id), 0), 2) AS value
+              FROM trials
+              WHERE acquisition_type = 'sales_assisted'
+                AND trial_start BETWEEN DATEADD('day', -30, CURRENT_DATE) AND DATEADD('day', -14, CURRENT_DATE)
 
       - name: "free_to_paid"
         display_name: "Free → Paid"
         description: "Conversion rate from free plan to any paid plan"
         stub_value: 5.8
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN upgraded_at IS NOT NULL THEN account_id END)
+            / NULLIF(COUNT(DISTINCT account_id), 0), 2) AS value
+          FROM accounts
+          WHERE original_plan = 'free' AND created_at >= DATEADD('day', -90, CURRENT_DATE)
 
       - name: "dau"
         display_name: "Daily Active Users"
         description: "Unique users active in the last 24 hours"
         stub_value: 12450
         unit: "users"
+        sql: "SELECT COUNT(DISTINCT user_id) AS value FROM user_sessions WHERE session_start >= DATEADD('hour', -24, CURRENT_TIMESTAMP())"
 
       - name: "weekly_active_accounts"
         display_name: "Weekly Active Accounts"
         description: "Unique accounts with at least one active user in last 7 days"
         stub_value: 28400
         unit: "accounts"
+        sql: "SELECT COUNT(DISTINCT account_id) AS value FROM user_sessions WHERE session_start >= DATEADD('day', -7, CURRENT_DATE)"
 
       - name: "activation_rate"
         display_name: "Activation Rate"
         description: "Percentage of new signups completing key activation milestone within 14 days"
         stub_value: 41.5
         unit: "%"
+        sql: >
+          SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN activated_at IS NOT NULL THEN user_id END)
+            / NULLIF(COUNT(DISTINCT user_id), 0), 2) AS value
+          FROM user_activation
+          WHERE signup_date BETWEEN DATEADD('day', -28, CURRENT_DATE) AND DATEADD('day', -14, CURRENT_DATE)
 
 # ────────────────────────────────────────────────────────────────────────
 # Hex integration references (used when HEX_API_TOKEN is set)

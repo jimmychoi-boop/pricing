@@ -1,8 +1,8 @@
 """Metrics connector — fetches metric snapshots from Hex, warehouse, or stubs.
 
-Supports three data source tiers:
+Supports three data source tiers (checked in priority order):
   1. Hex saved queries  (when HEX_API_TOKEN is configured)
-  2. Warehouse SQL       (when WAREHOUSE_DSN is configured — future)
+  2. Snowflake SQL       (when SNOWFLAKE_ACCOUNT is configured)
   3. Stub values         (from configs/metrics.yaml, always available)
 
 The connector reads the dataset-oriented metrics.yaml config, iterates over
@@ -13,13 +13,13 @@ for consumption by the Metrics Intelligence agent.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
 import yaml
 
 from packages.connectors import hex as hex_connector
+from packages.connectors import warehouse
 
 log = logging.getLogger(__name__)
 
@@ -36,22 +36,28 @@ def _resolve_value(metric_def: dict) -> float | int | None:
 
     Priority: hex_query_id > sql > stub_value
     """
+    name = metric_def.get("name", "unknown")
+
     # 1. Try Hex saved query
     hex_qid = metric_def.get("hex_query_id")
     if hex_qid and hex_connector.is_available():
         rows = hex_connector.run_saved_query(hex_qid)
         if rows and len(rows) > 0:
-            # Convention: saved query returns a single row with a 'value' column
             first_row = rows[0]
             val = first_row.get("value", first_row.get(list(first_row.keys())[0]))
             if val is not None:
-                log.debug("Resolved %s via Hex query %s", metric_def.get("name"), hex_qid)
+                log.debug("Resolved %s via Hex query %s", name, hex_qid)
                 return val
 
-    # 2. Warehouse SQL — placeholder for future implementation
-    # sql = metric_def.get("sql")
-    # if sql and os.getenv("WAREHOUSE_DSN"):
-    #     return _execute_warehouse_query(sql)
+    # 2. Try Snowflake SQL
+    sql = metric_def.get("sql")
+    if sql and warehouse.is_available():
+        val = warehouse.execute_scalar(sql)
+        if val is not None:
+            log.debug("Resolved %s via Snowflake SQL", name)
+            return val
+        else:
+            log.warning("Snowflake SQL returned no value for %s, falling back to stub", name)
 
     # 3. Stub value (always available for MVP)
     return metric_def.get("stub_value")
@@ -72,22 +78,47 @@ def _resolve_driver_values(drivers: list[dict]) -> list[dict[str, Any]]:
     return resolved
 
 
-def _resolve_segment_stubs(
-    segments_def: dict[str, list[str]],
+def _resolve_segments(
+    segments_def: dict[str, Any],
     base_value: float,
 ) -> dict[str, dict[str, float]]:
-    """Generate stub segment breakdowns by distributing the base value.
+    """Resolve segment breakdowns from SQL or stubs.
 
-    In production, each segment's value would come from a Hex query or SQL.
-    For stubs, we distribute proportionally with some variance.
+    Each segment dimension can have a sql_template or fall back to stub distribution.
+
+    segments_def format:
+      plan: ["free", "starter", "professional", "enterprise"]
+      # or with SQL:
+      plan:
+        values: ["free", "starter", "professional", "enterprise"]
+        sql: "SELECT plan_name, SUM(mrr) FROM ... GROUP BY 1"
     """
     import random
     result: dict[str, dict[str, float]] = {}
-    for dimension, values in segments_def.items():
+
+    for dimension, dim_def in segments_def.items():
+        # Handle both formats: list of values or dict with sql
+        if isinstance(dim_def, list):
+            values = dim_def
+            sql = None
+        elif isinstance(dim_def, dict):
+            values = dim_def.get("values", [])
+            sql = dim_def.get("sql")
+        else:
+            continue
+
+        # Try SQL first
+        if sql and warehouse.is_available():
+            seg_data = warehouse.execute_segment_query(sql)
+            if seg_data:
+                result[dimension] = seg_data
+                log.debug("Resolved segment %s via Snowflake SQL (%d segments)", dimension, len(seg_data))
+                continue
+
+        # Fall back to stub distribution
         n = len(values)
         if n == 0:
             continue
-        # Generate proportional weights with some randomness
         rng = random.Random(hash(dimension) + hash(str(base_value)))
         weights = [rng.uniform(0.3, 1.0) for _ in range(n)]
         total_w = sum(weights)
@@ -95,7 +126,17 @@ def _resolve_segment_stubs(
             val: round(base_value * (w / total_w), 2)
             for val, w in zip(values, weights)
         }
+
     return result
+
+
+def _data_source_label() -> str:
+    """Return a label describing the active data source."""
+    if hex_connector.is_available():
+        return "Hex"
+    if warehouse.is_available():
+        return "Snowflake"
+    return "stub"
 
 
 def fetch_metrics_snapshot(
@@ -119,9 +160,9 @@ def fetch_metrics_snapshot(
     """
     cfg = _load_config(config_path)
     datasets = cfg.get("datasets", {})
-    hex_cfg = cfg.get("hex", {})
     now = datetime.utcnow().isoformat() + "Z"
     snapshot: dict[str, dict[str, Any]] = {}
+    source_label = _data_source_label()
 
     for dataset_key, dataset_def in datasets.items():
         dataset_display = dataset_def.get("display_name", dataset_key)
@@ -142,7 +183,7 @@ def fetch_metrics_snapshot(
             segments_def = m.get("segments")
             segments = None
             if segments_def:
-                segments = _resolve_segment_stubs(segments_def, float(value))
+                segments = _resolve_segments(segments_def, float(value))
 
             snapshot[name] = {
                 "display_name": m.get("display_name", name),
@@ -160,9 +201,7 @@ def fetch_metrics_snapshot(
 
     log.info(
         "Fetched %d metrics across %d datasets (%s mode)",
-        len(snapshot),
-        len(datasets),
-        "Hex" if hex_connector.is_available() else "stub",
+        len(snapshot), len(datasets), source_label,
     )
     return snapshot
 
