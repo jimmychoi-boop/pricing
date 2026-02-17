@@ -19,7 +19,8 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from packages.agents import docs_agent, leader_agent, metrics_agent
-from packages.connectors import email_sender
+# Notification connectors available but not active yet
+# from packages.connectors import email_sender
 from packages.connectors.google_docs import fetch_doc_plain_text
 from packages.connectors.google_drive import list_comments, list_docs_in_folders
 from packages.connectors.metrics import fetch_metrics_snapshot
@@ -65,7 +66,7 @@ def run_pipeline() -> None:
         "signals_docs": 0,
         "signals_metrics": 0,
         "signals_total": 0,
-        "email_sent": False,
+        "notified": False,
     }
 
     try:
@@ -142,16 +143,11 @@ def run_pipeline() -> None:
         stats["recap_length"] = len(recap_text)
         stats["ranked_signals"] = len(ranked)
 
-        # ── 8. Send recap via email ───────────────────────────────────
-        if os.getenv("GMAIL_ADDRESS") and os.getenv("GMAIL_APP_PASSWORD"):
-            log.info("Sending recap via email")
-            ok = email_sender.send_recap(recap_text)
-            stats["email_sent"] = ok
-            if not ok:
-                log.warning("Email send failed — recap was still saved to DB")
-        else:
-            log.info("GMAIL_ADDRESS not set — printing recap to stdout")
-            print("\n" + recap_text + "\n")
+        # ── 8. Output recap (no external notifications yet) ──────────
+        # Leader Agent output is persisted to DB for downstream agents.
+        # External delivery (email/Slack) can be enabled later.
+        log.info("Recap generated — saved to DB for downstream consumption")
+        print("\n" + recap_text + "\n")
 
         # ── 9. Finalize run ───────────────────────────────────────────
         stats["recap_text"] = recap_text
