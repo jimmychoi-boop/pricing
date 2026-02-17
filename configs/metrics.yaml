@@ -1,47 +1,298 @@
-# Metric definitions for the Daily Strategy Recap.
-# MVP: stub values are used when no warehouse connection is available.
-# Later: replace stub_value with a real SQL query or Hex notebook reference.
+# Metric definitions for the Daily Strategy Recap — Metrics Intelligence Agent.
+#
+# Each metric belongs to a dataset group and can source data from:
+#   - stub_value: hardcoded value for MVP / offline testing
+#   - sql: warehouse query (executed when warehouse connector is active)
+#   - hex_query_id: Hex saved query ID (executed via Hex API)
+#   - hex_chart_id: Hex saved chart for visual reference
+#
+# Segment breakdowns define the dimensions along which the agent
+# decomposes movements (plan, SA/SS, cohort, region, channel, product_line).
 
-metrics:
-  - name: "daily_active_users"
-    display_name: "Daily Active Users"
-    description: "Number of unique users active in the last 24 hours"
-    stub_value: 12450
-    unit: "users"
-    # sql: "SELECT COUNT(DISTINCT user_id) FROM events WHERE event_date = CURRENT_DATE"
+# ────────────────────────────────────────────────────────────────────────
+# Dataset: MRR Movements
+# ────────────────────────────────────────────────────────────────────────
+datasets:
+  mrr_movements:
+    display_name: "MRR Movements"
+    description: "Monthly Recurring Revenue and its components"
+    metrics:
+      - name: "mrr_total"
+        display_name: "Total MRR"
+        description: "Current total monthly recurring revenue"
+        stub_value: 2850000
+        unit: "$"
+        # sql: "SELECT SUM(mrr) FROM subscriptions WHERE status = 'active'"
+        # hex_query_id: "q-mrr-total-daily"
+        drivers:
+          - name: "new_business"
+            display_name: "New Business"
+            description: "MRR from newly acquired customers"
+            stub_value: 145000
+            # sql: "SELECT SUM(mrr) FROM subscriptions WHERE activated_date = CURRENT_DATE"
+          - name: "expansion"
+            display_name: "Expansion"
+            description: "MRR increase from existing customers (upgrades, add-ons)"
+            stub_value: 82000
+          - name: "contraction"
+            display_name: "Contraction"
+            description: "MRR decrease from existing customers (downgrades)"
+            stub_value: -31000
+          - name: "churn"
+            display_name: "Churn"
+            description: "MRR lost from cancelled subscriptions"
+            stub_value: -67000
+          - name: "reactivation"
+            display_name: "Reactivation"
+            description: "MRR from previously churned customers returning"
+            stub_value: 12000
+        segments:
+          plan: ["free", "starter", "professional", "enterprise"]
+          sa_ss: ["self_serve", "sales_assisted"]
+          cohort: ["q1_2025", "q2_2025", "q3_2025", "q4_2025", "q1_2026"]
+          region: ["north_america", "emea", "apac", "latam"]
+          channel: ["direct", "partner", "marketplace"]
+          product_line: ["core", "api", "esignature", "notary"]
 
-  - name: "new_signups"
-    display_name: "New Signups"
-    description: "New account registrations in the last 24 hours"
-    stub_value: 342
-    unit: "accounts"
+      - name: "mrr_net_new"
+        display_name: "Net New MRR"
+        description: "Net change in MRR (new + expansion - churn - contraction + reactivation)"
+        stub_value: 141000
+        unit: "$"
 
-  - name: "mrr"
-    display_name: "Monthly Recurring Revenue"
-    description: "Current MRR as of today"
-    stub_value: 2850000
-    unit: "USD"
+      - name: "churn_rate_mrr"
+        display_name: "MRR Churn Rate"
+        description: "Percentage of MRR lost to churn in the last 30 days"
+        stub_value: 2.35
+        unit: "%"
 
-  - name: "churn_rate"
-    display_name: "Churn Rate"
-    description: "Percentage of customers churned in the last 30 days"
-    stub_value: 3.2
-    unit: "%"
+      - name: "net_dollar_retention"
+        display_name: "Net Dollar Retention"
+        description: "Revenue retention from existing customers (>100% = expansion)"
+        stub_value: 108.5
+        unit: "%"
 
-  - name: "nps_score"
-    display_name: "NPS Score"
-    description: "Net Promoter Score from latest survey batch"
-    stub_value: 47
-    unit: "score"
+  # ────────────────────────────────────────────────────────────────────────
+  # Dataset: Usage (docs sent/created)
+  # ────────────────────────────────────────────────────────────────────────
+  usage:
+    display_name: "Usage Metrics"
+    description: "Product usage — documents sent, created, and processed"
+    metrics:
+      - name: "docs_sent"
+        display_name: "Documents Sent"
+        description: "Total documents sent for signature in last 24h"
+        stub_value: 48750
+        unit: "docs"
+        drivers:
+          - name: "api_sends"
+            display_name: "API Sends"
+            description: "Documents sent via API integrations"
+            stub_value: 31200
+          - name: "web_sends"
+            display_name: "Web App Sends"
+            description: "Documents sent through the web application"
+            stub_value: 14350
+          - name: "mobile_sends"
+            display_name: "Mobile Sends"
+            description: "Documents sent from mobile apps"
+            stub_value: 3200
+        segments:
+          plan: ["free", "starter", "professional", "enterprise"]
+          sa_ss: ["self_serve", "sales_assisted"]
+          product_line: ["esignature", "notary", "core"]
 
-  - name: "support_tickets_open"
-    display_name: "Open Support Tickets"
-    description: "Number of currently open support tickets"
-    stub_value: 89
-    unit: "tickets"
+      - name: "docs_created"
+        display_name: "Documents Created"
+        description: "New documents/templates created in last 24h"
+        stub_value: 12340
+        unit: "docs"
 
-  - name: "avg_deal_cycle_days"
-    display_name: "Avg Deal Cycle"
-    description: "Average days from opportunity creation to close"
-    stub_value: 34
-    unit: "days"
+      - name: "docs_completed"
+        display_name: "Documents Completed"
+        description: "Documents fully signed and completed in last 24h"
+        stub_value: 41200
+        unit: "docs"
+
+      - name: "completion_rate"
+        display_name: "Completion Rate"
+        description: "Percentage of sent documents that reached completed status"
+        stub_value: 84.5
+        unit: "%"
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Dataset: Seats
+  # ────────────────────────────────────────────────────────────────────────
+  seats:
+    display_name: "Seat Metrics"
+    description: "Licensed and active seat counts"
+    metrics:
+      - name: "seats_licensed"
+        display_name: "Licensed Seats"
+        description: "Total seats under active subscription"
+        stub_value: 87500
+        unit: "seats"
+        segments:
+          plan: ["starter", "professional", "enterprise"]
+          sa_ss: ["self_serve", "sales_assisted"]
+
+      - name: "seats_active"
+        display_name: "Active Seats"
+        description: "Seats with at least one login in the last 30 days"
+        stub_value: 62300
+        unit: "seats"
+
+      - name: "seat_utilization"
+        display_name: "Seat Utilization"
+        description: "Percentage of licensed seats that are active"
+        stub_value: 71.2
+        unit: "%"
+        drivers:
+          - name: "enterprise_utilization"
+            display_name: "Enterprise Utilization"
+            stub_value: 64.0
+            description: "Enterprise plan seat utilization"
+          - name: "professional_utilization"
+            display_name: "Professional Utilization"
+            stub_value: 78.5
+            description: "Professional plan seat utilization"
+          - name: "starter_utilization"
+            display_name: "Starter Utilization"
+            stub_value: 81.3
+            description: "Starter plan seat utilization"
+
+      - name: "seats_net_added"
+        display_name: "Net Seats Added"
+        description: "Net new seats added (provisioned minus deprovisioned) in last 24h"
+        stub_value: 340
+        unit: "seats"
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Dataset: Purchases & Add-ons
+  # ────────────────────────────────────────────────────────────────────────
+  purchases:
+    display_name: "Purchases & Add-ons"
+    description: "One-time purchases, add-on subscriptions, and envelope packs"
+    metrics:
+      - name: "envelope_purchases"
+        display_name: "Envelope Purchases"
+        description: "Envelope pack purchases in last 24h"
+        stub_value: 1250
+        unit: "purchases"
+        drivers:
+          - name: "overage_triggered"
+            display_name: "Overage-Triggered"
+            description: "Purchases triggered by hitting envelope limits"
+            stub_value: 820
+          - name: "proactive_topup"
+            display_name: "Proactive Top-up"
+            description: "Purchases made before hitting limits"
+            stub_value: 430
+
+      - name: "addon_subscriptions"
+        display_name: "Add-on Subscriptions"
+        description: "New add-on feature subscriptions in last 24h"
+        stub_value: 185
+        unit: "subscriptions"
+        segments:
+          product_line: ["api_access", "advanced_fields", "sms_auth", "id_verification", "bulk_send"]
+
+      - name: "addon_mrr"
+        display_name: "Add-on MRR"
+        description: "Monthly recurring revenue from add-on subscriptions"
+        stub_value: 385000
+        unit: "$"
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Dataset: Adoption Funnels
+  # ────────────────────────────────────────────────────────────────────────
+  adoption_funnels:
+    display_name: "Adoption Funnels"
+    description: "User activation, adoption stages, and conversion funnels"
+    metrics:
+      - name: "signup_to_first_send"
+        display_name: "Signup → First Send"
+        description: "Conversion rate from signup to first document send (7-day window)"
+        stub_value: 34.2
+        unit: "%"
+        segments:
+          sa_ss: ["self_serve", "sales_assisted"]
+          channel: ["direct", "partner", "marketplace"]
+
+      - name: "trial_to_paid"
+        display_name: "Trial → Paid"
+        description: "Conversion rate from trial start to paid subscription"
+        stub_value: 18.7
+        unit: "%"
+        drivers:
+          - name: "self_serve_conversion"
+            display_name: "Self-Serve Conversion"
+            stub_value: 12.4
+            description: "Trial-to-paid for self-serve signups"
+          - name: "sales_assisted_conversion"
+            display_name: "Sales-Assisted Conversion"
+            stub_value: 38.2
+            description: "Trial-to-paid for sales-assisted signups"
+
+      - name: "free_to_paid"
+        display_name: "Free → Paid"
+        description: "Conversion rate from free plan to any paid plan"
+        stub_value: 5.8
+        unit: "%"
+
+      - name: "dau"
+        display_name: "Daily Active Users"
+        description: "Unique users active in the last 24 hours"
+        stub_value: 12450
+        unit: "users"
+
+      - name: "weekly_active_accounts"
+        display_name: "Weekly Active Accounts"
+        description: "Unique accounts with at least one active user in last 7 days"
+        stub_value: 28400
+        unit: "accounts"
+
+      - name: "activation_rate"
+        display_name: "Activation Rate"
+        description: "Percentage of new signups completing key activation milestone within 14 days"
+        stub_value: 41.5
+        unit: "%"
+
+# ────────────────────────────────────────────────────────────────────────
+# Hex integration references (used when HEX_API_TOKEN is set)
+# ────────────────────────────────────────────────────────────────────────
+hex:
+  workspace_id: null  # Set via HEX_WORKSPACE_ID env var
+  saved_queries:
+    mrr_waterfall: null      # hex query ID for MRR waterfall
+    usage_trends: null       # hex query ID for usage trends
+    seat_utilization: null   # hex query ID for seat utilization
+    funnel_analysis: null    # hex query ID for adoption funnel
+    segment_breakdown: null  # hex query ID for segment deep-dive
+  saved_charts:
+    mrr_daily: null
+    usage_daily: null
+    funnel_daily: null
+
+# ────────────────────────────────────────────────────────────────────────
+# Segment dimension definitions
+# ────────────────────────────────────────────────────────────────────────
+segment_dimensions:
+  plan:
+    display_name: "Plan"
+    values: ["free", "starter", "professional", "enterprise"]
+  sa_ss:
+    display_name: "Self-Serve vs Sales-Assisted"
+    values: ["self_serve", "sales_assisted"]
+  cohort:
+    display_name: "Signup Cohort"
+    values: ["q1_2025", "q2_2025", "q3_2025", "q4_2025", "q1_2026"]
+  region:
+    display_name: "Region"
+    values: ["north_america", "emea", "apac", "latam"]
+  channel:
+    display_name: "Channel"
+    values: ["direct", "partner", "marketplace"]
+  product_line:
+    display_name: "Product Line"
+    values: ["core", "api", "esignature", "notary"]

@@ -23,7 +23,7 @@ from packages.agents import docs_agent, leader_agent, metrics_agent
 # from packages.connectors import email_sender
 from packages.connectors.google_docs import fetch_doc_plain_text
 from packages.connectors.google_drive import list_comments, list_docs_in_folders
-from packages.connectors.metrics import fetch_metrics_snapshot
+from packages.connectors.metrics import fetch_metrics_snapshot, fetch_hex_chart_urls
 from packages.store.db import RecapDB
 from packages.store.schema import RunRecord
 
@@ -66,6 +66,11 @@ def run_pipeline() -> None:
         "signals_docs": 0,
         "signals_metrics": 0,
         "signals_total": 0,
+        "metrics_deltas": 0,
+        "metrics_anomalies": 0,
+        "metrics_drivers": 0,
+        "metrics_segments": 0,
+        "metrics_follow_ups": 0,
         "notified": False,
     }
 
@@ -121,11 +126,18 @@ def run_pipeline() -> None:
         )
         stats["signals_docs"] = len(doc_signals)
 
-        # ── 5. Fetch metrics + run Metrics Agent ──────────────────────
+        # ── 5. Fetch metrics + run Metrics Intelligence Agent ──────────
         log.info("Fetching metrics snapshot")
         metrics_snapshot = fetch_metrics_snapshot()
-        metric_signals = metrics_agent.run(snapshot=metrics_snapshot, db=db)
+        metric_signals, metrics_output = metrics_agent.run(
+            snapshot=metrics_snapshot, db=db
+        )
         stats["signals_metrics"] = len(metric_signals)
+        stats["metrics_deltas"] = len(metrics_output.deltas)
+        stats["metrics_anomalies"] = len(metrics_output.anomalies)
+        stats["metrics_drivers"] = len(metrics_output.drivers)
+        stats["metrics_segments"] = len(metrics_output.segments)
+        stats["metrics_follow_ups"] = len(metrics_output.follow_up_queries)
 
         # ── 6. Persist all signals ────────────────────────────────────
         all_signals = doc_signals + metric_signals
@@ -143,14 +155,25 @@ def run_pipeline() -> None:
         stats["recap_length"] = len(recap_text)
         stats["ranked_signals"] = len(ranked)
 
-        # ── 8. Output recap (no external notifications yet) ──────────
-        # Leader Agent output is persisted to DB for downstream agents.
-        # External delivery (email/Slack) can be enabled later.
+        # ── 8. Output recap ───────────────────────────────────────────
         log.info("Recap generated — saved to DB for downstream consumption")
         print("\n" + recap_text + "\n")
 
+        # Log metrics intelligence summary
+        if metrics_output.anomalies:
+            log.info(
+                "Metrics Intelligence summary: %d anomalies detected, "
+                "%d driver decompositions, %d segment impacts, "
+                "%d follow-up queries generated",
+                len(metrics_output.anomalies),
+                len(metrics_output.drivers),
+                len(metrics_output.segments),
+                len(metrics_output.follow_up_queries),
+            )
+
         # ── 9. Finalize run ───────────────────────────────────────────
         stats["recap_text"] = recap_text
+        stats["metrics_intelligence"] = metrics_output.to_dict()
         db.finish_run(run_record.run_id, "success", stats)
         log.info("=== Run %s completed successfully ===", run_record.run_id)
 

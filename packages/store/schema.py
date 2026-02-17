@@ -7,6 +7,11 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Literal
 
+# ── Segment dimensions used across metrics intelligence ────────────────
+SEGMENT_DIMENSIONS = Literal[
+    "plan", "sa_ss", "cohort", "region", "channel", "product_line"
+]
+
 
 @dataclass
 class Evidence:
@@ -76,6 +81,101 @@ class MetricSnapshot:
     metric_name: str
     snapshot_at: str
     payload_json: dict
+
+
+# ── Metrics Intelligence output models ─────────────────────────────────
+
+
+@dataclass
+class MetricDelta:
+    """What moved: daily delta for a single metric."""
+
+    metric_name: str
+    display_name: str
+    current_value: float
+    previous_value: float
+    abs_delta: float
+    pct_change: float
+    direction: Literal["up", "down", "flat"]
+    unit: str
+    is_anomaly: bool
+    period: str = "daily"  # daily, weekly, monthly
+    timestamp: str | None = None  # ISO-8601
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class DriverDecomposition:
+    """Why it moved: factor-level attribution for a metric change."""
+
+    metric_name: str
+    driver_name: str  # e.g. "expansion", "new_business", "churn", "contraction"
+    contribution: float  # absolute contribution to the delta
+    pct_of_delta: float  # what % of the total delta this driver explains
+    description: str
+    evidence: list[Evidence] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["evidence"] = [e.to_dict() for e in self.evidence]
+        return d
+
+
+@dataclass
+class SegmentImpact:
+    """Who was impacted: segment-level breakdown of a metric movement."""
+
+    metric_name: str
+    dimension: str  # plan, sa_ss, cohort, region, channel, product_line
+    segment_value: str  # e.g. "Enterprise", "North America", "Q3-2025 cohort"
+    segment_delta: float
+    segment_pct_change: float
+    segment_current: float
+    direction: Literal["up", "down", "flat"]
+    is_outsized: bool  # True if this segment moved disproportionately
+    description: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class FollowUpQuery:
+    """Suggested SQL/Hex query to validate or drill into a finding."""
+
+    metric_name: str
+    question: str  # human-readable question this query answers
+    query_type: Literal["sql", "hex_saved_query", "hex_chart"]
+    query_text: str  # SQL or Hex reference ID
+    priority: Literal["high", "medium", "low"]
+    rationale: str  # why this follow-up matters
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class MetricsIntelligenceOutput:
+    """Structured output from the Metrics Intelligence agent (Agent B)."""
+
+    run_timestamp: str
+    deltas: list[MetricDelta] = field(default_factory=list)
+    anomalies: list[MetricDelta] = field(default_factory=list)
+    drivers: list[DriverDecomposition] = field(default_factory=list)
+    segments: list[SegmentImpact] = field(default_factory=list)
+    follow_up_queries: list[FollowUpQuery] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "run_timestamp": self.run_timestamp,
+            "deltas": [d.to_dict() for d in self.deltas],
+            "anomalies": [a.to_dict() for a in self.anomalies],
+            "drivers": [d.to_dict() for d in self.drivers],
+            "segments": [s.to_dict() for s in self.segments],
+            "follow_up_queries": [q.to_dict() for q in self.follow_up_queries],
+        }
 
 
 @dataclass

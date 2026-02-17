@@ -10,12 +10,49 @@ min_confidence: 0.3
 top_issues: 5
 watchlist_items: 3
 
-# Metric anomaly thresholds
+# Fuzzy-match threshold for deduplication (0-100)
+dedup_similarity: 80
+
+# ────────────────────────────────────────────────────────────────────────
+# Metrics Intelligence thresholds (Agent B)
+# ────────────────────────────────────────────────────────────────────────
 metric_anomaly:
-  # Percentage change from previous day to flag as anomaly
+  # Percentage change from previous snapshot to flag as anomaly
   pct_change_threshold: 15.0
   # Absolute delta threshold (fallback when previous value is 0)
   abs_change_threshold: 10.0
 
-# Fuzzy-match threshold for deduplication (0-100)
-dedup_similarity: 80
+metrics_intelligence:
+  # Delta detection — any metric crossing these triggers a delta entry
+  delta:
+    min_pct_change: 1.0        # report deltas above 1% change
+    anomaly_pct_threshold: 15.0  # flag as anomaly above 15%
+    anomaly_abs_threshold: 10.0  # flag as anomaly above ±10 absolute
+
+  # Driver decomposition — when to surface driver-level detail
+  drivers:
+    min_contribution_pct: 5.0  # ignore drivers contributing < 5% of the total delta
+    highlight_dominant_pct: 60.0  # highlight drivers explaining > 60% of delta
+
+  # Segment impact — when to flag a segment as outsized
+  segments:
+    outsized_multiplier: 2.0   # segment moved ≥ 2x the overall metric % change
+    min_segment_abs_delta: 5.0 # ignore tiny segment movements
+
+  # Follow-up query generation
+  follow_ups:
+    max_queries_per_anomaly: 3   # cap follow-up queries per anomalous metric
+    max_total_queries: 10        # cap total follow-up queries per run
+
+  # Severity mapping (pct_change ranges -> severity score 1-5)
+  severity_bands:
+    - max_pct: 5.0
+      severity: 1
+    - max_pct: 10.0
+      severity: 2
+    - max_pct: 20.0
+      severity: 3
+    - max_pct: 35.0
+      severity: 4
+    - max_pct: 999999.0
+      severity: 5
