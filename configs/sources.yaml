@@ -2,8 +2,7 @@
 # Replace folder IDs with your actual Google Drive folder IDs.
 
 drive_folder_ids:
-  - "REPLACE_WITH_FOLDER_ID_1"
-  # - "REPLACE_WITH_FOLDER_ID_2"
+  - "1JFlhg1g1B_0Fa5eQpK28YGRTfCCLg5xI"
 
 allowed_mime_types:
   - "application/vnd.google-apps.document"
